@@ -35,16 +35,32 @@ jobs:
     - name: Docker Compose up
       run: docker-compose up -d
 
-    - name: Run health check
+    - name: Create .env file for panel
       run: |
-        # Replace this with your actual health check commands
-        sleep 30
-        curl -f http://localhost || exit 1
+        echo "DB_PASSWORD=CHANGE_ME" >> .env
+        echo "APP_URL=https://pterodactyl.zall.com" >> .env
+        echo "APP_TIMEZONE=UTC" >> .env
+        echo "APP_SERVICE_AUTHOR=noreply@gmail.com" >> .env
+        echo "TRUSTED_PROXIES=*" >> .env
+        echo "MAIL_FROM=noreply@gmail.com" >> .env
+        echo "MAIL_DRIVER=smtp" >> .env
+        echo "MAIL_HOST=mail" >> .env
+        echo "MAIL_PORT=1025" >> .env
+        echo "MAIL_USERNAME=" >> .env
+        echo "MAIL_PASSWORD=" >> .env
+        echo "MAIL_ENCRYPTION=true" >> .env
+
+    - name: Copy .env file to panel service
+      run: docker cp .env $(docker-compose ps -q panel):/app/.env
+
+    - name: Run panel migrations
+      run: docker-compose exec -T panel php artisan migrate --force
 
     - name: Create admin user
       run: |
-        docker-compose exec panel php artisan p:user:make --email=admin@gmail.com --username=Admin123 --name="Admin User" --password=SecurePass123 --admin
+        docker-compose exec -T panel php artisan p:user:make --email=admin@gmail.com --username=Admin123 --name="Admin User" --password=SecurePass123 --admin
 
     - name: Docker Compose down
       if: always()
       run: docker-compose down
+
