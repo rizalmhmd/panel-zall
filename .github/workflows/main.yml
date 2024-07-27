@@ -53,14 +53,12 @@ jobs:
     - name: Copy .env file to panel service
       run: docker cp .env $(docker-compose ps -q panel):/app/.env
 
+    - name: Generate application key
+      run: docker-compose exec -T panel php artisan key:generate
+
     - name: Run panel migrations
       run: docker-compose exec -T panel php artisan migrate --force
 
     - name: Create admin user
       run: |
         docker-compose exec -T panel php artisan p:user:make --email=admin@gmail.com --username=Admin123 --name="Admin User" --password=SecurePass123 --admin
-
-    - name: Docker Compose down
-      if: always()
-      run: docker-compose down
-
