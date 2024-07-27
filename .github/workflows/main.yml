@@ -27,7 +27,7 @@ jobs:
       with:
         registry: ghcr.io
         username: ${{ github.repository_owner }}
-        password: ${{ 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 }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Docker Compose
       run: sudo apt-get install docker-compose
@@ -41,11 +41,10 @@ jobs:
         sleep 30
         curl -f http://localhost || exit 1
 
-    - name: Docker Compose
-      if: always()
-      run: docker-compose
-      
-    - name: panel
-      run: docker-compose run --rm panel php artisan p:user:make
-      run: yes
+    - name: Create admin user
+      run: |
+        docker-compose exec panel php artisan p:user:make --email=admin@gmail.com --username=Admin123 --name="Admin User" --password=SecurePass123 --admin
 
+    - name: Docker Compose down
+      if: always()
+      run: docker-compose down
