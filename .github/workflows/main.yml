@@ -1,46 +1,94 @@
-name: CI
+name: Node.js CI
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    branches: [ "master" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        node-version: [20.x]
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg imagemagick
+      - run: npm install
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v1
-
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v1
-      with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Set up Docker Compose
-      run: sudo apt-get install docker-compose
-
-    - name: Docker Compose up
-      run: docker-compose up -d
-
-    - name: Run health check
-      run: |
-        # Replace this with your actual health check commands
-        sleep 30
-        curl -f http://localhost || exit 1
-
-    - name: Docker Compose down
-      if: always()
-      run: docker-compose down
+      # Docker Compose step
+      - name: Set up Docker Compose
+        run: |
+          echo 'version: "3.8"' > docker-compose.yml
+          echo 'x-common:' >> docker-compose.yml
+          echo '  database:' >> docker-compose.yml
+          echo '    &db-environment' >> docker-compose.yml
+          echo '    MYSQL_PASSWORD: &db-password "CHANGE_ME"' >> docker-compose.yml
+          echo '    MYSQL_ROOT_PASSWORD: "CHANGE_ME_TOO"' >> docker-compose.yml
+          echo '  panel:' >> docker-compose.yml
+          echo '    &panel-environment' >> docker-compose.yml
+          echo '    APP_URL: "https://pterodactyl.example.com"' >> docker-compose.yml
+          echo '    APP_TIMEZONE: "UTC"' >> docker-compose.yml
+          echo '    APP_SERVICE_AUTHOR: "noreply@example.com"' >> docker-compose.yml
+          echo '    TRUSTED_PROXIES: "*"' >> docker-compose.yml
+          echo '  mail:' >> docker-compose.yml
+          echo '    &mail-environment' >> docker-compose.yml
+          echo '    MAIL_FROM: "noreply@example.com"' >> docker-compose.yml
+          echo '    MAIL_DRIVER: "smtp"' >> docker-compose.yml
+          echo '    MAIL_HOST: "mail"' >> docker-compose.yml
+          echo '    MAIL_PORT: "1025"' >> docker-compose.yml
+          echo '    MAIL_USERNAME: ""' >> docker-compose.yml
+          echo '    MAIL_PASSWORD: ""' >> docker-compose.yml
+          echo '    MAIL_ENCRYPTION: "true"' >> docker-compose.yml
+          echo 'services:' >> docker-compose.yml
+          echo '  database:' >> docker-compose.yml
+          echo '    image: mariadb:10.5' >> docker-compose.yml
+          echo '    restart: always' >> docker-compose.yml
+          echo '    command: --default-authentication-plugin=mysql_native_password' >> docker-compose.yml
+          echo '    volumes:' >> docker-compose.yml
+          echo '      - "/srv/pterodactyl/database:/var/lib/mysql"' >> docker-compose.yml
+          echo '    environment:' >> docker-compose.yml
+          echo '      <<: *db-environment' >> docker-compose.yml
+          echo '      MYSQL_DATABASE: "panel"' >> docker-compose.yml
+          echo '      MYSQL_USER: "pterodactyl"' >> docker-compose.yml
+          echo '  cache:' >> docker-compose.yml
+          echo '    image: redis:alpine' >> docker-compose.yml
+          echo '    restart: always' >> docker-compose.yml
+          echo '  panel:' >> docker-compose.yml
+          echo '    image: ghcr.io/pterodactyl/panel:latest' >> docker-compose.yml
+          echo '    restart: always' >> docker-compose.yml
+          echo '    ports:' >> docker-compose.yml
+          echo '      - "80:80"' >> docker-compose.yml
+          echo '      - "443:443"' >> docker-compose.yml
+          echo '    links:' >> docker-compose.yml
+          echo '      - database' >> docker-compose.yml
+          echo '      - cache' >> docker-compose.yml
+          echo '    volumes:' >> docker-compose.yml
+          echo '      - "/srv/pterodactyl/var/:/app/var/"' >> docker-compose.yml
+          echo '      - "/srv/pterodactyl/nginx/:/etc/nginx/http.d/"' >> docker-compose.yml
+          echo '      - "/srv/pterodactyl/certs/:/etc/letsencrypt/"' >> docker-compose.yml
+          echo '      - "/srv/pterodactyl/logs/:/app/storage/logs"' >> docker-compose.yml
+          echo '    environment:' >> docker-compose.yml
+          echo '      <<: [*panel-environment, *mail-environment]' >> docker-compose.yml
+          echo '      DB_PASSWORD: *db-password' >> docker-compose.yml
+          echo '      APP_ENV: "production"' >> docker-compose.yml
+          echo '      APP_ENVIRONMENT_ONLY: "false"' >> docker-compose.yml
+          echo '      CACHE_DRIVER: "redis"' >> docker-compose.yml
+          echo '      SESSION_DRIVER: "redis"' >> docker-compose.yml
+          echo '      QUEUE_DRIVER: "redis"' >> docker-compose.yml
+          echo '      REDIS_HOST: "cache"' >> docker-compose.yml
+          echo '      DB_HOST: "database"' >> docker-compose.yml
+          echo '      DB_PORT: "3306"' >> docker-compose.yml
+          echo 'networks:' >> docker-compose.yml
+          echo '  default:' >> docker-compose.yml
+          echo '    ipam:' >> docker-compose.yml
+          echo '      config:' >> docker-compose.yml
+          echo '        - subnet: 172.20.0.0/16' >> docker-compose.yml
+      - run: docker-compose up -d
+      - run: npm start
