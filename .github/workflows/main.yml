@@ -41,7 +41,10 @@ jobs:
         # Create the user with --no-password flag to avoid interactive input
         docker-compose run --rm panel php artisan p:user:make --email="zall@gmail.com" --username="admin" --name-first="Admin" --name-last="User" --admin=1 --no-password
 
-
+    - name: Bypass Proxy
+      run: |
+        export no_proxy="pterodactyl.zall.com"
+        
     - name: Keep the job running
       run: |
         echo "Keeping the job running until GitHub Actions time limit..."
