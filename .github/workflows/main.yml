@@ -41,6 +41,12 @@ jobs:
         # Create the user with --no-password flag to avoid interactive input
         docker-compose run --rm panel php artisan p:user:make --email="zall@gmail.com" --username="admin" --name-first="Admin" --name-last="User" --admin=1 --no-password
 
+    - name: Configure Firewall (UFW Example)
+      run: |
+        sudo ufw allow 80/tcp
+        sudo ufw allow 443/tcp
+        sudo ufw reload
+    
     - name: Bypass Proxy
       run: |
         export no_proxy="pterodactyl.zall.com"
