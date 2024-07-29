@@ -3,7 +3,7 @@ name: Deploy Pterodactyl
 on:
   push:
     branches:
-      - master  # Atur sesuai dengan cabang yang ingin Anda gunakan
+      - main  # Atur sesuai dengan cabang yang ingin Anda gunakan
 
 jobs:
   deploy:
